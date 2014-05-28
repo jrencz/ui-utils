@@ -24,65 +24,80 @@ factory('keypressHelper', ['$parse', function keypress($parse){
     return string.charAt(0).toUpperCase() + string.slice(1);
   };
 
-  return function(mode, scope, elm, attrs) {
-    var params, combinations = [];
-    params = scope.$eval(attrs['ui'+capitaliseFirstLetter(mode)]);
+  return function (mode, scope, elm, attrs, params) {
 
-    // Prepare combinations for simple checking
-    angular.forEach(params, function (v, k) {
-      var combination, expression;
-      expression = $parse(v);
+    if (attrs && attrs['ui' + capitaliseFirstLetter(mode) + 'Observable']) {
+      attrs.$observe('ui' + capitaliseFirstLetter(mode) + 'Observable', function () {
+        params = scope.$eval(attrs['ui' + capitaliseFirstLetter(mode)])
+        elm.off(mode);
+        bind();
+      })
+    } else {
+      params = params || scope.$eval(attrs['ui' + capitaliseFirstLetter(mode)])
+      bind();
+    }
 
-      angular.forEach(k.split(' '), function(variation) {
-        combination = {
-          expression: expression,
-          keys: {}
-        };
-        angular.forEach(variation.split('-'), function (value) {
-          combination.keys[value] = true;
-        });
-        combinations.push(combination);
-      });
-    });
+    function bind() {
+      var combinations = [];
 
-    // Check only matching of pressed keys one of the conditions
-    elm.bind(mode, function (event) {
-      // No need to do that inside the cycle
-      var metaPressed = !!(event.metaKey && !event.ctrlKey);
-      var altPressed = !!event.altKey;
-      var ctrlPressed = !!event.ctrlKey;
-      var shiftPressed = !!event.shiftKey;
-      var keyCode = event.keyCode;
+      // Prepare combinations for simple checking
+      angular.forEach(params, function (v, k) {
+        var combination, expression;
+        expression = $parse(v);
 
-      // normalize keycodes
-      if (mode === 'keypress' && !shiftPressed && keyCode >= 97 && keyCode <= 122) {
-        keyCode = keyCode - 32;
-      }
-
-      // Iterate over prepared combinations
-      angular.forEach(combinations, function (combination) {
-
-        var mainKeyPressed = combination.keys[keysByCode[keyCode]] || combination.keys[keyCode.toString()];
-
-        var metaRequired = !!combination.keys.meta;
-        var altRequired = !!combination.keys.alt;
-        var ctrlRequired = !!combination.keys.ctrl;
-        var shiftRequired = !!combination.keys.shift;
-
-        if (
-          mainKeyPressed &&
-          ( metaRequired === metaPressed ) &&
-          ( altRequired === altPressed ) &&
-          ( ctrlRequired === ctrlPressed ) &&
-          ( shiftRequired === shiftPressed )
-        ) {
-          // Run the function
-          scope.$apply(function () {
-            combination.expression(scope, { '$event': event });
+        angular.forEach(k.split(' '), function (variation) {
+          combination = {
+            expression: expression,
+            keys: {}
+          };
+          angular.forEach(variation.split('-'), function (value) {
+            combination.keys[value] = true;
           });
-        }
+          combinations.push(combination);
+        });
       });
-    });
+
+      // Check only matching of pressed keys one of the conditions
+      elm.on(mode, function (event) {
+        // No need to do that inside the cycle
+        var metaPressed = !!(event.metaKey && !event.ctrlKey);
+        var altPressed = !!event.altKey;
+        var ctrlPressed = !!event.ctrlKey;
+        var shiftPressed = !!event.shiftKey;
+        var keyCode = event.keyCode;
+
+        // normalize keycodes
+        if (mode === 'keypress' && !shiftPressed && keyCode >= 97 && keyCode <= 122) {
+          keyCode = keyCode - 32;
+        }
+
+        // Iterate over prepared combinations
+        angular.forEach(combinations, function (combination) {
+
+          var mainKeyPressed = combination.keys[keysByCode[keyCode]] || combination.keys[keyCode.toString()];
+
+          var metaRequired = !!combination.keys.meta;
+          var altRequired = !!combination.keys.alt;
+          var ctrlRequired = !!combination.keys.ctrl;
+          var shiftRequired = !!combination.keys.shift;
+
+          if (
+            mainKeyPressed &&
+            ( metaRequired === metaPressed ) &&
+            ( altRequired === altPressed ) &&
+            ( ctrlRequired === ctrlPressed ) &&
+            ( shiftRequired === shiftPressed )
+            ) {
+            // Run the function
+            scope.$apply(function () {
+              combination.expression(scope, { '$event': event });
+            });
+          }
+        });
+      });
+    }
+
+    bind();
   };
 }]);
 
